@@ -1,28 +1,60 @@
-import React, { useState, useRef, useEffect } from 'react';
-import { Upload, Send, FileText, BarChart3, Code, Image, MessageCircle, Trash2, Download, Loader } from 'lucide-react';
-import './App.css';
+import React, { useState, useRef, useEffect } from "react";
+import {
+  Upload,
+  Send,
+  FileText,
+  BarChart3,
+  Code,
+  Image,
+  MessageCircle,
+  Trash2,
+  Download,
+  Loader,
+} from "lucide-react";
+import "./App.css";
 
 const CSVAnalyzer = () => {
   const [chatHistory, setChatHistory] = useState([]);
   const [currentFile, setCurrentFile] = useState(null);
-  const [query, setQuery] = useState('');
+  const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef(null);
   const chatEndRef = useRef(null);
+  const [sessionId, setSessionId] = useState(null);
 
   // Store image URLs for each assistant message by message id
   const [imageURLs, setImageURLs] = useState({});
 
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatHistory]);
 
-  const handleFileUpload = (file) => {
-    if (file && file.type === 'text/csv') {
+  // Upload file to backend and get sessionId
+  const handleFileUpload = async (file) => {
+    if (file && file.type === "text/csv") {
       setCurrentFile(file);
+      // Upload to backend and get sessionId
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const response = await fetch("http://localhost:8000/upload/", {
+          method: "POST",
+          body: formData,
+        });
+        const result = await response.json();
+        if (result.session_id) {
+          setSessionId(result.session_id);
+        } else {
+          alert("Failed to upload file.");
+          setCurrentFile(null);
+        }
+      } catch (err) {
+        alert("Failed to upload file.");
+        setCurrentFile(null);
+      }
     } else {
-      alert('Please upload a valid CSV file');
+      alert("Please upload a valid CSV file");
     }
   };
 
@@ -43,28 +75,30 @@ const CSVAnalyzer = () => {
     setDragOver(false);
   };
 
+  // Analyze using sessionId and query
   const analyzeCSV = async () => {
-    if (!currentFile || !query.trim()) return;
+    if (!currentFile || !query.trim() || !sessionId) return;
 
     setLoading(true);
+
     const formData = new FormData();
-    formData.append('file', currentFile);
-    formData.append('user_query', query);
+    formData.append("session_id", sessionId);
+    formData.append("user_query", query);
 
     const userMessage = {
       id: Date.now(),
-      type: 'user',
+      type: "user",
       content: query,
       timestamp: new Date().toLocaleTimeString(),
-      fileName: currentFile.name
+      fileName: currentFile.name,
     };
 
-    setChatHistory(prev => [...prev, userMessage]);
-    setQuery('');
+    setChatHistory((prev) => [...prev, userMessage]);
+    setQuery("");
 
     try {
-      const response = await fetch('http://localhost:8000/analyze/', {
-        method: 'POST',
+      const response = await fetch("http://localhost:8000/analyze/", {
+        method: "POST",
         body: formData,
       });
 
@@ -72,20 +106,20 @@ const CSVAnalyzer = () => {
 
       const assistantMessage = {
         id: Date.now() + 1,
-        type: 'assistant',
+        type: "assistant",
         content: result,
         timestamp: new Date().toLocaleTimeString(),
       };
 
-      setChatHistory(prev => [...prev, assistantMessage]);
+      setChatHistory((prev) => [...prev, assistantMessage]);
     } catch (error) {
       const errorMessage = {
         id: Date.now() + 1,
-        type: 'error',
+        type: "error",
         content: `Error: ${error.message}`,
         timestamp: new Date().toLocaleTimeString(),
       };
-      setChatHistory(prev => [...prev, errorMessage]);
+      setChatHistory((prev) => [...prev, errorMessage]);
     } finally {
       setLoading(false);
     }
@@ -94,41 +128,57 @@ const CSVAnalyzer = () => {
   // Fetch and display image, then delete it from backend
   const fetchAndShowImage = async (msgId) => {
     try {
-      const response = await fetch('http://localhost:8000/get_image/');
+      const response = await fetch("http://localhost:8000/get_image/");
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        setImageURLs(prev => ({ ...prev, [msgId]: url }));
+        setImageURLs((prev) => ({ ...prev, [msgId]: url }));
 
         // Delete the image from backend after fetching
-        await fetch('http://localhost:8000/delete_image/', { method: 'DELETE' });
+        await fetch("http://localhost:8000/delete_image/", {
+          method: "DELETE",
+        });
       }
     } catch (error) {
-      console.error('Error fetching or deleting image:', error);
+      console.error("Error fetching or deleting image:", error);
     }
   };
 
   // Download image (optional, still available for user)
   const downloadImage = async () => {
     try {
-      const response = await fetch('http://localhost:8000/get_image/');
+      const response = await fetch("http://localhost:8000/get_image/");
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
+        const a = document.createElement("a");
         a.href = url;
-        a.download = 'analysis-output.png';
+        a.download = "analysis-output.png";
         a.click();
         window.URL.revokeObjectURL(url);
       }
     } catch (error) {
-      console.error('Error downloading image:', error);
+      console.error("Error downloading image:", error);
     }
   };
 
-  const clearChat = () => {
+  // Clear chat and session on backend
+  const clearChat = async () => {
+    if (sessionId) {
+      const formData = new FormData();
+      formData.append("session_id", sessionId);
+      try {
+        await fetch("http://localhost:8000/clear_session/", {
+          method: "POST",
+          body: formData,
+        });
+      } catch (err) {
+        // Ignore error, just clear frontend state
+      }
+    }
     setChatHistory([]);
     setCurrentFile(null);
+    setSessionId(null);
     setImageURLs({});
   };
 
@@ -139,7 +189,7 @@ const CSVAnalyzer = () => {
           <Code size={16} color="#60a5fa" />
           <span>Generated Code</span>
         </div>
-        <button 
+        <button
           onClick={() => navigator.clipboard.writeText(code)}
           className="copy-btn"
         >
@@ -152,8 +202,6 @@ const CSVAnalyzer = () => {
     </div>
   );
 
-  // Remove MetadataDisplay, as per instruction
-
   // OutputDisplay now only renders if stdout is present
   const OutputDisplay = ({ stdout, stderr }) => (
     <div className="output-display">
@@ -163,9 +211,7 @@ const CSVAnalyzer = () => {
             <BarChart3 size={16} color="#16a34a" />
             <span>Analysis Output</span>
           </div>
-          <pre className="output-content success">
-            {stdout}
-          </pre>
+          <pre className="output-content success">{stdout}</pre>
         </div>
       )}
       {stderr && (
@@ -173,9 +219,7 @@ const CSVAnalyzer = () => {
           <div className="output-header error">
             <span>Error Output</span>
           </div>
-          <pre className="output-content error">
-            {stderr}
-          </pre>
+          <pre className="output-content error">{stderr}</pre>
         </div>
       )}
     </div>
@@ -184,13 +228,16 @@ const CSVAnalyzer = () => {
   // Add a useEffect to fetch image when a new assistant message with image_generated or both_generated is added
   useEffect(() => {
     // Find the latest assistant message with image_generated or both_generated and no imageURL yet
-    const lastAssistant = [...chatHistory].reverse().find(
-      (msg) =>
-        msg.type === 'assistant' &&
-        msg.content &&
-        (msg.content.flags?.image_generated || msg.content.flags?.both_generated) &&
-        !imageURLs[msg.id]
-    );
+    const lastAssistant = [...chatHistory]
+      .reverse()
+      .find(
+        (msg) =>
+          msg.type === "assistant" &&
+          msg.content &&
+          (msg.content.flags?.image_generated ||
+            msg.content.flags?.both_generated) &&
+          !imageURLs[msg.id]
+      );
     if (lastAssistant) {
       fetchAndShowImage(lastAssistant.id);
     }
@@ -217,16 +264,13 @@ const CSVAnalyzer = () => {
               <BarChart3 size={24} />
             </div>
             <div>
-              <h1 className="header-title">
-                CSV Analyzer Pro
-              </h1>
-              <p className="header-subtitle">AI-Powered Data Analysis & Visualization</p>
+              <h1 className="header-title">CSV Analyzer Pro</h1>
+              <p className="header-subtitle">
+                AI-Powered Data Analysis & Visualization
+              </p>
             </div>
           </div>
-          <button
-            onClick={clearChat}
-            className="clear-btn"
-          >
+          <button onClick={clearChat} className="clear-btn">
             <Trash2 size={16} />
             Clear Chat
           </button>
@@ -242,11 +286,11 @@ const CSVAnalyzer = () => {
                 <Upload size={20} color="#2563eb" />
                 Upload Dataset
               </h2>
-              
+
               <div
-                className={`upload-zone ${
-                  dragOver ? 'drag-over' : ''
-                } ${currentFile ? 'has-file' : ''}`}
+                className={`upload-zone ${dragOver ? "drag-over" : ""} ${
+                  currentFile ? "has-file" : ""
+                }`}
                 onDrop={handleDrop}
                 onDragOver={handleDragOver}
                 onDragLeave={handleDragLeave}
@@ -259,7 +303,7 @@ const CSVAnalyzer = () => {
                   accept=".csv"
                   className="hidden"
                 />
-                
+
                 {currentFile ? (
                   <div>
                     <div className="upload-icon-container success">
@@ -278,8 +322,12 @@ const CSVAnalyzer = () => {
                       <Upload size={32} color="#6b7280" />
                     </div>
                     <div>
-                      <p className="upload-text default">Drop your CSV file here</p>
-                      <p className="upload-subtext default">or click to browse</p>
+                      <p className="upload-text default">
+                        Drop your CSV file here
+                      </p>
+                      <p className="upload-subtext default">
+                        or click to browse
+                      </p>
                     </div>
                   </div>
                 )}
@@ -287,9 +335,7 @@ const CSVAnalyzer = () => {
 
               {/* Query Input */}
               <div className="query-section">
-                <label className="query-label">
-                  Analysis Query
-                </label>
+                <label className="query-label">Analysis Query</label>
                 <div>
                   <textarea
                     value={query}
@@ -309,7 +355,7 @@ const CSVAnalyzer = () => {
                   ) : (
                     <Send size={20} />
                   )}
-                  {loading ? 'Analyzing...' : 'Analyze Data'}
+                  {loading ? "Analyzing..." : "Analyze Data"}
                 </button>
               </div>
             </div>
@@ -324,7 +370,7 @@ const CSVAnalyzer = () => {
                   Analysis History
                 </h2>
               </div>
-              
+
               <div className="chat-content">
                 {chatHistory.length === 0 ? (
                   <div className="chat-empty">
@@ -332,7 +378,9 @@ const CSVAnalyzer = () => {
                       <MessageCircle size={40} color="#9ca3af" />
                     </div>
                     <p className="chat-empty-text">No analysis history yet</p>
-                    <p className="chat-empty-subtext">Upload a CSV file and ask a question to get started</p>
+                    <p className="chat-empty-subtext">
+                      Upload a CSV file and ask a question to get started
+                    </p>
                   </div>
                 ) : (
                   <div className="chat-messages">
@@ -344,10 +392,8 @@ const CSVAnalyzer = () => {
                           key={message.id}
                           className={`message ${message.type}`}
                         >
-                          <div
-                            className={`message-bubble ${message.type}`}
-                          >
-                            {message.type === 'user' ? (
+                          <div className={`message-bubble ${message.type}`}>
+                            {message.type === "user" ? (
                               <div>
                                 <div className="message-header user">
                                   <span>You</span>
@@ -358,15 +404,19 @@ const CSVAnalyzer = () => {
                                     </span>
                                   )}
                                 </div>
-                                <p className="message-content">{message.content}</p>
+                                <p className="message-content">
+                                  {message.content}
+                                </p>
                               </div>
-                            ) : message.type === 'error' ? (
+                            ) : message.type === "error" ? (
                               <div>
                                 <div className="message-header error">
                                   <span>Error</span>
                                   <span>{message.timestamp}</span>
                                 </div>
-                                <p className="message-content">{message.content}</p>
+                                <p className="message-content">
+                                  {message.content}
+                                </p>
                               </div>
                             ) : (
                               <div>
@@ -374,11 +424,13 @@ const CSVAnalyzer = () => {
                                   <span>AI Assistant</span>
                                   <span>{message.timestamp}</span>
                                 </div>
-                                
+
                                 {/* Do NOT show Dataset Information */}
-                                
+
                                 {message.content.generated_code && (
-                                  <CodeBlock code={message.content.generated_code} />
+                                  <CodeBlock
+                                    code={message.content.generated_code}
+                                  />
                                 )}
 
                                 {/* Show analysis output only if stdout_generated or both_generated */}
@@ -410,7 +462,11 @@ const CSVAnalyzer = () => {
                                         <img
                                           src={imageURLs[message.id]}
                                           alt="Analysis Visualization"
-                                          style={{ maxWidth: '100%', borderRadius: '0.5rem', marginTop: '0.5rem' }}
+                                          style={{
+                                            maxWidth: "100%",
+                                            borderRadius: "0.5rem",
+                                            marginTop: "0.5rem",
+                                          }}
                                         />
                                       </div>
                                     ) : (
