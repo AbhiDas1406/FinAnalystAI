@@ -87,3 +87,29 @@ async def get_image(session_id: str = Query(...)):
         return FileResponse(local_path, media_type="image/png", filename="output.png")
     except Exception:
         return JSONResponse(content={"error": "No image found"}, status_code=404)
+    
+
+# Optional: Background task to clean up old sessions
+# Uncomment the following code to enable automatic cleanup of old sessions
+# import threading
+# import time
+# from datetime import datetime, timezone, timedelta
+
+# SESSION_TIMEOUT_HOURS = 1  # Change to 24 for 1 day
+
+# def cleanup_old_sessions():
+#     while True:
+#         try:
+#             response = s3.list_objects_v2(Bucket=S3_BUCKET, Prefix="sessions/")
+#             now = datetime.now(timezone.utc)
+#             for obj in response.get("Contents", []):
+#                 last_modified = obj["LastModified"]
+#                 if (now - last_modified) > timedelta(hours=SESSION_TIMEOUT_HOURS):
+#                     s3.delete_object(Bucket=S3_BUCKET, Key=obj["Key"])
+#                     print(f"Deleted old session file: {obj['Key']}")
+#         except Exception as e:
+#             print(f"Cleanup error: {e}")
+#         time.sleep(3600)  # Run every hour
+
+# # Start the cleanup thread when the app starts
+# threading.Thread(target=cleanup_old_sessions, daemon=True).start()
