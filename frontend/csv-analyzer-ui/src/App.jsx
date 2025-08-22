@@ -38,10 +38,13 @@ const CSVAnalyzer = () => {
       const formData = new FormData();
       formData.append("file", file);
       try {
-        const response = await fetch("http://localhost:8000/upload/", {
-          method: "POST",
-          body: formData,
-        });
+        const response = await fetch(
+          "https://finanalystai.onrender.com/upload/",
+          {
+            method: "POST",
+            body: formData,
+          }
+        );
         const result = await response.json();
         if (result.session_id) {
           setSessionId(result.session_id);
@@ -97,10 +100,13 @@ const CSVAnalyzer = () => {
     setQuery("");
 
     try {
-      const response = await fetch("http://localhost:8000/analyze/", {
-        method: "POST",
-        body: formData,
-      });
+      const response = await fetch(
+        "https://finanalystai.onrender.com/analyze/",
+        {
+          method: "POST",
+          body: formData,
+        }
+      );
 
       const result = await response.json();
 
@@ -128,14 +134,16 @@ const CSVAnalyzer = () => {
   // Fetch and display image, then delete it from backend
   const fetchAndShowImage = async (msgId) => {
     try {
-      const response = await fetch("http://localhost:8000/get_image/");
+      const response = await fetch(
+        "https://finanalystai.onrender.com/get_image/"
+      );
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         setImageURLs((prev) => ({ ...prev, [msgId]: url }));
 
         // Delete the image from backend after fetching
-        await fetch("http://localhost:8000/delete_image/", {
+        await fetch("https://finanalystai.onrender.com/delete_image/", {
           method: "DELETE",
         });
       }
@@ -147,7 +155,9 @@ const CSVAnalyzer = () => {
   // Download image (optional, still available for user)
   const downloadImage = async () => {
     try {
-      const response = await fetch("http://localhost:8000/get_image/");
+      const response = await fetch(
+        "https://finanalystai.onrender.com/get_image/"
+      );
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
@@ -168,7 +178,7 @@ const CSVAnalyzer = () => {
       const formData = new FormData();
       formData.append("session_id", sessionId);
       try {
-        await fetch("http://localhost:8000/clear_session/", {
+        await fetch("https://finanalystai.onrender.com/clear_session/", {
           method: "POST",
           body: formData,
         });
