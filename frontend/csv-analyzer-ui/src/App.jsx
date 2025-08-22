@@ -131,32 +131,29 @@ const CSVAnalyzer = () => {
     }
   };
 
-  // Fetch and display image, then delete it from backend
+  // Fetch and display image for the current session
   const fetchAndShowImage = async (msgId) => {
+    if (!sessionId) return;
     try {
       const response = await fetch(
-        "https://finanalystai.onrender.com/get_image/"
+        `https://finanalystai.onrender.com/get_image/?session_id=${sessionId}`
       );
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         setImageURLs((prev) => ({ ...prev, [msgId]: url }));
-
-        // Delete the image from backend after fetching
-        await fetch("https://finanalystai.onrender.com/delete_image/", {
-          method: "DELETE",
-        });
       }
     } catch (error) {
-      console.error("Error fetching or deleting image:", error);
+      console.error("Error fetching image:", error);
     }
   };
 
-  // Download image (optional, still available for user)
+  // Download image for the current session
   const downloadImage = async () => {
+    if (!sessionId) return;
     try {
       const response = await fetch(
-        "https://finanalystai.onrender.com/get_image/"
+        `https://finanalystai.onrender.com/get_image/?session_id=${sessionId}`
       );
       if (response.ok) {
         const blob = await response.blob();
