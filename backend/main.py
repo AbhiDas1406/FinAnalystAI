@@ -76,3 +76,29 @@ async def get_image():
     if os.path.exists(image_path):
         return FileResponse(image_path, media_type="image/png", filename="output.png")
     return JSONResponse(content={"error": "No image found"}, status_code=404)
+
+
+import time
+import threading
+
+# How old (in seconds) before a session is considered abandoned
+SESSION_TIMEOUT_SECONDS = 3600  # 1 hour
+
+def cleanup_sessions():
+    while True:
+        now = time.time()
+        for session_id in os.listdir(SESSION_DIR):
+            session_path = os.path.join(SESSION_DIR, session_id)
+            if os.path.isdir(session_path):
+                # Use last modified time of the session directory
+                mtime = os.path.getmtime(session_path)
+                if now - mtime > SESSION_TIMEOUT_SECONDS:
+                    try:
+                        shutil.rmtree(session_path)
+                        print(f"Deleted old session: {session_id}")
+                    except Exception as e:
+                        print(f"Error deleting session {session_id}: {e}")
+        time.sleep(600)  # Run every 10 minutes
+
+# Start the cleanup thread when the app starts
+threading.Thread(target=cleanup_sessions, daemon=True).start()
