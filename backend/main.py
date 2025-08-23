@@ -7,6 +7,7 @@ import boto3
 from utils.llmhandler import generate_code_from_query
 from utils.pythonexecutor import run_generated_code
 from utils.processdata import extract_csv_metadata_and_sample
+from datetime import datetime
 
 app = FastAPI()
 
@@ -55,16 +56,21 @@ async def analyze_csv(
 
     # If an image was generated, upload it to S3 (overwrite previous)
     image_path = "output.png"
-    image_s3_key = f"sessions/{session_id}/output.png"
+    timestamp = datetime.utcnow().strftime("%Y%m%d%H%M%S")
+    image_s3_key = f"sessions/{session_id}/output_{timestamp}.png"
+    image_url = None
     if os.path.exists(image_path):
         s3.upload_file(image_path, S3_BUCKET, image_s3_key)
+        image_url = image_s3_key # Save the S3 key for frontend to fetch
 
     response = {
         "metadata_and_sample": csv_info,
         "generated_code": code,
         "stdout": output,
         "stderr": error,
-        "flags": flags
+        "flags": flags,
+        "image_key": image_url,  # Pass this to frontend
+        "image_timestamp": timestamp if image_url else None
     }
 
     return JSONResponse(content=response)
@@ -79,12 +85,12 @@ async def clear_session(session_id: str = Form(...)):
     return JSONResponse(content={"status": "session cleared"})
 
 @app.get("/get_image/")
-async def get_image(session_id: str = Query(...)):
+async def get_image(session_id: str = Query(...), timestamp: str = Query(...)):
     image_s3_key = f"sessions/{session_id}/output.png"
-    local_path = f"/tmp/output_{session_id}.png"
+    local_path = f"/tmp/output_{session_id}_{timestamp}.png"
     try:
         s3.download_file(S3_BUCKET, image_s3_key, local_path)
-        return FileResponse(local_path, media_type="image/png", filename="output.png")
+        return FileResponse(local_path, media_type="image/png", filename=f"output_{timestamp}.png")
     except Exception:
         return JSONResponse(content={"error": "No image found"}, status_code=404)
     
