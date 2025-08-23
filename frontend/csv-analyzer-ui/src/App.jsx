@@ -132,11 +132,11 @@ const CSVAnalyzer = () => {
   };
 
   // Fetch and display image for the current session
-  const fetchAndShowImage = async (msgId) => {
-    if (!sessionId) return;
+  const fetchAndShowImage = async (msgId, timestamp) => {
+    if (!sessionId || !timestamp) return;
     try {
       const response = await fetch(
-        `https://finanalystai.onrender.com/get_image/?session_id=${sessionId}`
+        `https://finanalystai.onrender.com/get_image/?session_id=${sessionId}&timestamp=${timestamp}`
       );
       if (response.ok) {
         const blob = await response.blob();
@@ -149,18 +149,18 @@ const CSVAnalyzer = () => {
   };
 
   // Download image for the current session
-  const downloadImage = async () => {
-    if (!sessionId) return;
+  const downloadImage = async (timestamp) => {
+    if (!sessionId || !timestamp) return;
     try {
       const response = await fetch(
-        `https://finanalystai.onrender.com/get_image/?session_id=${sessionId}`
+        `https://finanalystai.onrender.com/get_image/?session_id=${sessionId}&timestamp=${timestamp}`
       );
       if (response.ok) {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement("a");
         a.href = url;
-        a.download = "analysis-output.png";
+        a.download = `analysis-output-${timestamp}.png`;
         a.click();
         window.URL.revokeObjectURL(url);
       }
@@ -243,10 +243,14 @@ const CSVAnalyzer = () => {
           msg.content &&
           (msg.content.flags?.image_generated ||
             msg.content.flags?.both_generated) &&
-          !imageURLs[msg.id]
+          !imageURLs[msg.id] &&
+          msg.content.image_timestamp
       );
     if (lastAssistant) {
-      fetchAndShowImage(lastAssistant.id);
+      fetchAndShowImage(
+        lastAssistant.id,
+        lastAssistant.content.image_timestamp
+      );
     }
     // eslint-disable-next-line
   }, [chatHistory]);
@@ -457,7 +461,11 @@ const CSVAnalyzer = () => {
                                         <span>Visualization</span>
                                       </div>
                                       <button
-                                        onClick={downloadImage}
+                                        onClick={() =>
+                                          downloadImage(
+                                            message.content.image_timestamp
+                                          )
+                                        }
                                         className="download-btn"
                                       >
                                         <Download size={16} />
