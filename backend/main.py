@@ -86,7 +86,7 @@ async def clear_session(session_id: str = Form(...)):
 
 @app.get("/get_image/")
 async def get_image(session_id: str = Query(...), timestamp: str = Query(...)):
-    image_s3_key = f"sessions/{session_id}/output.png"
+    image_s3_key = f"sessions/{session_id}/output_{timestamp}.png"
     local_path = f"/tmp/output_{session_id}_{timestamp}.png"
     try:
         s3.download_file(S3_BUCKET, image_s3_key, local_path)
